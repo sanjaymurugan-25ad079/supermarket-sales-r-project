@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supermarket Sales Analysis</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --card:#ffffff; --text:#1f2933; --muted:#6b7785; --border:#dde1e6;
+    --accent:#2f6fed; --accent-soft:#e7efff; --row-alt:#f3f5f8; --bar:#2f6fed;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#14171c; --card:#1d2128; --text:#e6e9ee; --muted:#98a2b0; --border:#2e343d;
+      --accent:#6c9cff; --accent-soft:#25304a; --row-alt:#222730; --bar:#6c9cff;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; line-height:1.5; }
+  header { padding:22px 28px 6px; }
+  h1 { margin:0; font-size:1.6rem; }
+  .layout { display:grid; grid-template-columns:260px 1fr; gap:20px; padding:16px 28px 40px; align-items:start; }
+  @media (max-width:820px){ .layout{ grid-template-columns:1fr; padding:12px 14px 30px; } header{padding:18px 14px 0;} }
+  .panel { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; }
+  label { display:block; font-weight:600; font-size:.9rem; margin-bottom:6px; }
+  input[type=file], select { width:100%; padding:8px; border:1px solid var(--border); border-radius:6px;
+    background:var(--bg); color:var(--text); font-size:.9rem; }
+  .field { margin-bottom:16px; }
+  .help { color:var(--muted); font-size:.82rem; }
+  .tabs { display:flex; gap:4px; flex-wrap:wrap; border-bottom:1px solid var(--border); margin-bottom:18px; }
+  .tab { padding:9px 14px; border:none; background:none; color:var(--muted); cursor:pointer;
+    font-size:.92rem; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+  .tabpane { display:none; } .tabpane.active { display:block; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:22px; }
+  .kpi { background:var(--accent-soft); border-radius:10px; padding:14px 16px; }
+  .kpi h4 { margin:0 0 4px; font-size:.8rem; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .kpi .v { font-size:1.35rem; font-weight:700; word-break:break-word; }
+  h3 { margin:6px 0 10px; font-size:1.05rem; }
+  .tablewrap { overflow-x:auto; max-height:420px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; margin-bottom:22px; }
+  table { border-collapse:collapse; width:100%; font-size:.9rem; }
+  th, td { padding:8px 12px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap; }
+  th { background:var(--row-alt); position:sticky; top:0; }
+  tbody tr:nth-child(even) { background:var(--row-alt); }
+  tbody tr:hover { background:var(--accent-soft); }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+  .chart-title { font-weight:600; margin:4px 0 12px; }
+  /* horizontal bars */
+  .hbar { display:grid; grid-template-columns:150px 1fr 80px; align-items:center; gap:10px; margin:5px 0; font-size:.88rem; }
+  .hbar .name { text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hbar .track { background:var(--row-alt); border-radius:4px; height:20px; }
+  .hbar .fill { background:var(--bar); height:100%; border-radius:4px; min-width:2px; }
+  .hbar .val { color:var(--muted); font-variant-numeric:tabular-nums; }
+  /* vertical bars */
+  .vchart { display:flex; align-items:flex-end; gap:14px; height:260px; padding:10px 6px 0; border-bottom:1px solid var(--border); }
+  .vcol { flex:1; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; height:100%; min-width:40px; }
+  .vcol .vfill { width:100%; max-width:70px; background:var(--bar); border-radius:4px 4px 0 0; }
+  .vcol .vnum { font-size:.8rem; margin-bottom:4px; color:var(--muted); }
+  .vlabels { display:flex; gap:14px; padding:6px 6px 0; }
+  .vlabels div { flex:1; min-width:40px; text-align:center; font-size:.78rem; color:var(--muted); word-break:break-word; }
+  .err { color:#c0392b; font-size:.85rem; margin-top:6px; }
+  .src { font-size:.8rem; color:var(--muted); margin-top:8px; }
+</style>
+</head>
+<body>
+<header><h1>Supermarket Sales Analysis</h1></header>
+
+<div class="layout">
+  <aside class="panel">
+    <div class="field">
+      <label for="file">Upload Sales CSV</label>
+      <input type="file" id="file" accept=".csv">
+      <div class="err" id="err"></div>
+      <div class="src" id="src">Showing built-in sample data.</div>
+    </div>
+    <div class="field">
+      <label for="category">Select Category</label>
+      <select id="category"><option>All</option></select>
+    </div>
+    <p class="help">Demonstrates CSV reading, data frames, frequency tables, factors, mathematical operations, and data filtering. CSV columns: Product, Category, Quantity, Price, Sales.</p>
+  </aside>
+
+  <main class="panel">
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="dash">Dashboard</button>
+      <button class="tab" data-tab="freq">Category Frequency</button>
+      <button class="tab" data-tab="math">Mathematical Analysis</button>
+      <button class="tab" data-tab="chart">Sales Chart</button>
+    </div>
+
+    <section class="tabpane active" id="dash">
+      <div class="kpis">
+        <div class="kpi"><h4>Total Sales</h4><div class="v" id="totalSales"></div></div>
+        <div class="kpi"><h4>Average Sales</h4><div class="v" id="avgSales"></div></div>
+        <div class="kpi"><h4>Total Quantity</h4><div class="v" id="totalQty"></div></div>
+        <div class="kpi"><h4>Top Product</h4><div class="v" id="topProduct"></div></div>
+      </div>
+      <h3>Sales Data</h3>
+      <div class="tablewrap"><table id="dataTable"></table></div>
+    </section>
+
+    <section class="tabpane" id="freq">
+      <div class="tablewrap"><table id="frequencyTable"></table></div>
+      <div class="chart-title">Category Frequency</div>
+      <div class="vchart" id="categoryBars"></div>
+      <div class="vlabels" id="categoryLabels"></div>
+    </section>
+
+    <section class="tabpane" id="math">
+      <div class="tablewrap" style="max-height:560px"><table id="mathTable"></table></div>
+    </section>
+
+    <section class="tabpane" id="chart">
+      <div class="chart-title">Sales by Product (Rs.)</div>
+      <div id="salesBars"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+const SAMPLE_CSV = `Product,Category,Quantity,Price,Sales
+Milk,Dairy,120,28,3360
+Butter,Dairy,45,55,2475
+Cheese,Dairy,30,120,3600
+Bread,Bakery,90,40,3600
+Cake,Bakery,15,350,5250
+Biscuits,Snacks,200,10,2000
+Chips,Snacks,150,20,3000
+Chocolate,Snacks,80,45,3600
+Tea Powder,Beverages,60,180,10800
+Coffee,Beverages,40,250,10000
+Orange Juice,Beverages,70,95,6650
+Cola,Beverages,110,40,4400
+Apples,Fruits & Vegetables,100,150,15000
+Bananas,Fruits & Vegetables,130,50,6500
+Tomatoes,Fruits & Vegetables,160,30,4800
+Onions,Fruits & Vegetables,180,35,6300
+Detergent,Household,50,210,10500
+Dish Soap,Household,65,85,5525
+Toothpaste,Household,95,90,8550
+Rice,Grocery,40,520,20800
+Cooking Oil,Grocery,55,180,9900
+Sugar,Grocery,85,48,4080`;
+
+let data = [];
+
+/* ---------- CSV parsing (handles quoted fields) ---------- */
+function parseCSV(text) {
+  const rows = []; let row = [], cell = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && text[i+1] === '"') { cell += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else cell += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i+1] === "\n") i++;
+      row.push(cell); cell = ""; if (row.length > 1 || row[0] !== "") rows.push(row); row = [];
+    } else cell += c;
+  }
+  if (cell !== "" || row.length) { row.push(cell); rows.push(row); }
+  const head = rows.shift().map(h => h.trim());
+  return rows.map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] ?? "").trim()])));
+}
+
+function loadData(text) {
+  const parsed = parseCSV(text);
+  const need = ["Product","Category","Quantity","Price","Sales"];
+  if (!parsed.length || need.some(k => !(k in parsed[0])))
+    throw new Error("CSV must contain the columns: " + need.join(", "));
+  return parsed.map(r => ({
+    Product: r.Product, Category: r.Category,
+    Quantity: Number(r.Quantity), Price: Number(r.Price), Sales: Number(r.Sales)
+  }));
+}
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("en-US");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sum = a => a.reduce((x, y) => x + y, 0);
+const filtered = () => { const c = $("category").value; return c === "All" ? data : data.filter(d => d.Category === c); };
+
+function tableHTML(cols, rows) {
+  return "<thead><tr>" + cols.map(c => `<th class="${c.num?'num':''}">${esc(c.label)}</th>`).join("") + "</tr></thead><tbody>" +
+    rows.map(r => "<tr>" + cols.map(c => `<td class="${c.num?'num':''}">${esc(r[c.key])}</td>`).join("") + "</tr>").join("") + "</tbody>";
+}
+
+function hbars(el, items, unit) {
+  const max = Math.max(...items.map(i => i.value), 1);
+  el.innerHTML = items.map(i =>
+    `<div class="hbar"><div class="name" title="${esc(i.name)}">${esc(i.name)}</div>
+     <div class="track"><div class="fill" style="width:${(i.value/max*100).toFixed(1)}%"></div></div>
+     <div class="val">${unit}${fmt(i.value)}</div></div>`).join("");
+}
+
+/* ---------- render ---------- */
+function render() {
+  const d = filtered();
+  const total = sum(d.map(x => x.Sales));
+  $("totalSales").textContent = "Rs. " + fmt(total);
+  $("avgSales").textContent = "Rs. " + (d.length ? Math.round(total / d.length * 100) / 100 : 0).toLocaleString("en-US");
+  $("totalQty").textContent = fmt(sum(d.map(x => x.Quantity)));
+
+  const byProd = {};
+  d.forEach(x => byProd[x.Product] = (byProd[x.Product] || 0) + x.Sales);
+  const prodTotals = Object.entries(byProd).sort((a, b) => b[1] - a[1]);
+  $("topProduct").textContent = prodTotals.length ? prodTotals[0][0] : "—";
+
+  $("dataTable").innerHTML = tableHTML(
+    [{key:"Product",label:"Product"},{key:"Category",label:"Category"},
+     {key:"Quantity",label:"Quantity",num:1},{key:"Price",label:"Price",num:1},{key:"Sales",label:"Sales",num:1}], d);
+
+  /* frequency (uses all data, like the R app) */
+  const freq = {};
+  data.forEach(x => freq[x.Category] = (freq[x.Category] || 0) + 1);
+  const cats = Object.keys(freq).sort();
+  $("frequencyTable").innerHTML = tableHTML(
+    [{key:"Category",label:"Category"},{key:"Frequency",label:"Frequency",num:1}],
+    cats.map(c => ({Category:c, Frequency:freq[c]})));
+  const fmax = Math.max(...cats.map(c => freq[c]), 1);
+  $("categoryBars").innerHTML = cats.map(c =>
+    `<div class="vcol"><div class="vnum">${freq[c]}</div><div class="vfill" style="height:${(freq[c]/fmax*85)}%"></div></div>`).join("");
+  $("categoryLabels").innerHTML = cats.map(c => `<div>${esc(c)}</div>`).join("");
+
+  /* mathematical analysis */
+  $("mathTable").innerHTML = tableHTML(
+    [{key:"Product",label:"Product"},{key:"Sales",label:"Sales",num:1},{key:"LogSales",label:"LogSales",num:1},
+     {key:"SqrtSales",label:"SqrtSales",num:1},{key:"RoundedSales",label:"RoundedSales",num:1}],
+    d.map(x => ({
+      Product:x.Product, Sales:x.Sales,
+      LogSales: x.Sales > 0 ? (Math.round(Math.log(x.Sales)*1000)/1000).toFixed(3) : "NaN",
+      SqrtSales: x.Sales >= 0 ? (Math.round(Math.sqrt(x.Sales)*1000)/1000).toFixed(3) : "NaN",
+      RoundedSales: (Math.round(x.Sales*10)/10).toFixed(1)
+    })));
+
+  /* sales chart: sorted ascending, drawn top-down largest first (like coord_flip + reorder) */
+  hbars($("salesBars"), [...d].sort((a, b) => b.Sales - a.Sales).map(x => ({name:x.Product, value:x.Sales})), "Rs. ");
+}
+
+function setCategories() {
+  const cats = [...new Set(data.map(d => d.Category))].sort();
+  $("category").innerHTML = ["All", ...cats].map(c => `<option>${esc(c)}</option>`).join("");
+}
+
+/* ---------- events ---------- */
+$("tabs").addEventListener("click", e => {
+  const t = e.target.closest(".tab"); if (!t) return;
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
+  document.querySelectorAll(".tabpane").forEach(p => p.classList.toggle("active", p.id === t.dataset.tab));
+});
+$("category").addEventListener("change", render);
+$("file").addEventListener("change", e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      data = loadData(r.result); $("err").textContent = "";
+      $("src").textContent = "Showing: " + f.name;
+      setCategories(); render();
+    } catch (err) { $("err").textContent = err.message; }
+  };
+  r.readAsText(f);
+});
+
+data = loadData(SAMPLE_CSV);
+setCategories();
+render();
+</script>
+</body>
+</html>
